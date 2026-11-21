@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Злой Снеговик</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--gold:#ffc83d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#fff;
+background:radial-gradient(circle at 75% 12%,#f6f1d0 0 6%,transparent 7%),linear-gradient(#0a1233,#1a2a6c 55%,#2d4c9c);touch-action:manipulation}
+#app{position:relative;height:100%;display:flex;flex-direction:column;padding:12px 14px calc(14px + env(safe-area-inset-bottom))}
+.top{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;position:relative;z-index:3}
+.pill{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:6px 12px}
+.gold{color:var(--gold)}
+.hp{margin-top:10px;background:rgba(0,0,0,.4);border-radius:14px;padding:8px 12px;border:1px solid rgba(255,255,255,.12);position:relative;z-index:3}
+.hp-row{display:flex;justify-content:space-between;font-weight:800;font-size:13px;margin-bottom:6px}
+.bar{height:14px;border-radius:8px;background:#0007;overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#c1122b,#ff5566);transition:width .15s}
+.stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;z-index:2}
+#boss{font-size:min(55vw,240px);line-height:1;filter:drop-shadow(0 0 28px #ff2a4388) drop-shadow(0 14px 18px #0009);transition:transform .07s;cursor:pointer}
+#boss.hit{transform:scale(.9) rotate(-4deg)}
+#boss.dead{animation:die .8s forwards}
+@keyframes die{to{transform:scale(0) rotate(240deg);opacity:0}}
+.floor{position:absolute;bottom:6%;width:70%;height:34px;border-radius:50%;background:radial-gradient(#e9f3ff,#9fc0ee);box-shadow:0 0 30px #7fb2ff88;z-index:-1}
+.fx{position:fixed;font-weight:900;font-size:26px;color:#fff;text-shadow:0 2px 0 #0008;pointer-events:none;z-index:6;animation:fly .8s ease-out forwards}
+.fx.crit{color:#ffd24a;font-size:38px}
+@keyframes fly{to{transform:translateY(-90px) scale(1.2);opacity:0}}
+.hint{text-align:center;position:relative;z-index:3}
+.hint b{font-size:17px}
+.hint small{display:block;opacity:.7;margin:2px 0 10px}
+.buff{display:none;text-align:center;color:#7fe3ff;font-weight:800;font-size:13px;margin-bottom:6px}
+.btn{width:100%;border:0;border-radius:18px;padding:16px;font-size:20px;font-weight:900;color:#4a2300;
+background:linear-gradient(#ffd75e,#f4a61c);box-shadow:0 5px 0 #b46f00,0 10px 24px #0007;letter-spacing:1px}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #b46f00}
+.snow{position:fixed;inset:0;pointer-events:none;z-index:1;overflow:hidden}
+.snow i{position:absolute;top:-10px;color:#fff;opacity:.8;animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(110vh) translateX(30px)}}
+/* окно оплаты */
+#shade{display:none;position:fixed;inset:0;background:#000a;z-index:9;align-items:flex-end}
+#sheet{width:100%;background:#1c2733;border-radius:22px 22px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom));text-align:center;animation:up .25s}
+@keyframes up{from{transform:translateY(100%)}}
+#sheet .ic{font-size:64px}
+#sheet h2{margin:6px 0 4px;font-size:20px}
+#sheet p{margin:0 0 16px;opacity:.75;font-size:14px}
+.pay{width:100%;border:0;border-radius:14px;padding:15px;font-size:17px;font-weight:800;color:#fff;background:#2f9be8}
+.later{margin-top:10px;background:none;border:0;color:#8da2b6;font-size:14px;padding:8px}
+</style>
+</head>
+<body>
+<div class="snow" id="snow"></div>
+<div id="app">
+  <div class="top"><span class="pill">🎄 НОВОГОДНИЙ ИВЕНТ</span><span class="pill gold">ФОНД: 5 000 ⭐</span></div>
+  <div class="hp">
+    <div class="hp-row"><span>☃️ ЗЛОЙ СНЕГОВИК <span id="lvl">ур.1</span></span><span class="gold"><span id="hpNow">5000</span> / <span id="hpMax">5000</span></span></div>
+    <div class="bar"><i id="hpBar"></i></div>
+  </div>
+  <div class="stage"><div class="floor"></div><div id="boss">⛄</div></div>
+  <div class="hint"><b>Бей снеговика и спасай праздник! 🎁</b><small>Каждый удар — урон. Кританёшь — урон ×5!</small></div>
+  <div class="buff" id="buff"></div>
+  <button class="btn" id="hitBtn">❄ БЕЙ СНЕГОВИКА! ❄</button>
+</div>
+
+<div id="shade"><div id="sheet">
+  <div class="ic">🔨</div>
+  <h2>Ледяной молот</h2>
+  <p>Урон ×3 на 60 секунд. Снеговик растает быстрее!</p>
+  <button class="pay" id="payBtn">Оплатить 43 ⭐</button>
+  <button class="later" id="laterBtn">Не сейчас</button>
+</div></div>
+
+<script>
+// ===== НАСТРОЙКИ =====
+const INVOICE_URL = "";   // ссылка из bot.create_invoice_link (см. bot_snippet.py)
+const PAY_EVERY   = 10;   // каждые N ударов показывать «Оплатить»
+const BASE_HP     = 5000;
+// =====================
+const tg = window.Telegram && Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+let level = 1, maxHp = BASE_HP, hp = maxHp, taps = 0, boostUntil = 0, locked = false;
+const $ = id => document.getElementById(id);
+const boss = $("boss");
+
+// снег
+for (let i = 0; i < 40; i++) {
+  const s = document.createElement("i");
+  s.textContent = "❄";
+  s.style.left = Math.random() * 100 + "%";
+  s.style.fontSize = 8 + Math.random() * 14 + "px";
+  s.style.animationDuration = 5 + Math.random() * 8 + "s";
+  s.style.animationDelay = -Math.random() * 10 + "s";
+  $("snow").appendChild(s);
+}
+
+function render() {
+  $("hpNow").textContent = Math.max(0, hp);
+  $("hpMax").textContent = maxHp;
+  $("hpBar").style.width = Math.max(0, hp / maxHp * 100) + "%";
+  $("lvl").textContent = "ур." + level;
+}
+
+function float(text, x, y, crit) {
+  const f = document.createElement("div");
+  f.className = "fx" + (crit ? " crit" : "");
+  f.textContent = (crit ? "КРИТ! " : "") + "-" + text;
+  f.style.left = x - 30 + "px";
+  f.style.top = y - 30 + "px";
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 800);
+}
+
+function hit(x, y) {
+  if (locked) return;
+  taps++;
+  const boosted = Date.now() < boostUntil;
+  const crit = Math.random() < 0.1;
+  let dmg = 5 + Math.floor(Math.random() * 20);
+  if (crit) dmg *= 5;
+  if (boosted) dmg *= 3;
+  hp -= dmg;
+  float(dmg, x, y, crit);
+  boss.classList.add("hit");
+  setTimeout(() => boss.classList.remove("hit"), 70);
+  if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(crit ? "heavy" : "light");
+  render();
+  if (hp <= 0) return defeat();
+  if (taps % PAY_EVERY === 0 && !boosted) openSheet();
+}
+
+function defeat() {
+  locked = true;
+  boss.classList.add("dead");
+  if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+  setTimeout(() => {
+    level++; maxHp = Math.round(maxHp * 1.3); hp = maxHp;
+    boss.classList.remove("dead"); locked = false; render();
+  }, 900);
+}
+
+function openSheet() { $("shade").style.display = "flex"; }
+function closeSheet() { $("shade").style.display = "none"; }
+
+function activateBoost() {
+  boostUntil = Date.now() + 60000;
+  $("buff").style.display = "block";
+  const t = setInterval(() => {
+    const left = Math.ceil((boostUntil - Date.now()) / 1000);
+    if (left <= 0) { clearInterval(t); $("buff").style.display = "none"; return; }
+    $("buff").textContent = "🔨 Ледяной молот ×3 — " + left + " сек";
+  }, 250);
+}
+
+$("payBtn").onclick = () => {
+  if (tg && tg.openInvoice && INVOICE_URL) {
+    tg.openInvoice(INVOICE_URL, status => {
+      if (status === "paid") { closeSheet(); activateBoost(); }
+      else if (status === "failed") tg.showAlert("Оплата не прошла, попробуй ещё раз");
+    });
+  } else {
+    // демо-режим, пока не вставлена ссылка на счёт
+    closeSheet(); activateBoost();
+  }
+};
+$("laterBtn").onclick = closeSheet;
+
+// тап по снеговику и по большой кнопке
+boss.addEventListener("pointerdown", e => { e.preventDefault(); hit(e.clientX, e.clientY); });
+$("hitBtn").addEventListener("pointerdown", e => {
+  e.preventDefault();
+  const r = boss.getBoundingClientRect();
+  hit(r.left + r.width * (0.3 + Math.random() * 0.4), r.top + r.height * 0.3);
+});
+render();
+</script>
+</body>
+</html>
